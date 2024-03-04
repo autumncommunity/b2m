@@ -11,10 +11,13 @@
 </h3>
 <br>
 
-#### [🧐 Download/Скачать](https://autumngmod.ru/b2m)
-#### [Suggest your own binary module here 👻](https://autumngmod.ru/discord)
-
 B2M - Binary Module Manager.
+
+| Part of B2M | Description |
+|:---:|:---:|
+| [b2m_binary](https://github.com/autumncommunity/b2m_binary) | Main Binary Module. Adds functions needed for b2m_lua to Lua. |
+| [b2m_lua](https://github.com/autumncommunity/b2m_lua) | All B2M Lua code |
+| [b2mmenu](https://github.com/autumncommunity/b2mmenu) | Binary module for add gameevent.Listen function |
 
 ### Working principle
 The client downloads B2M once from the site, and installs it according to the guide on the site.
