@@ -5,6 +5,14 @@
         thx dj smokey for nuke radio
 */
 
+if not b2m then
+    require("b2m")
+
+    if not b2m then
+        return print("B2M wasn't loaded!")
+    end
+end
+
 local ip
 
 // it's horrible
@@ -44,10 +52,6 @@ if SERVER then
 
         timer.Remove(timer_name)
     end)
-end
-
-if not b2m then
-    require("b2m")
 end
 
 if MENU_DLL then
@@ -136,27 +140,43 @@ function b2m.DB:GetClientPackagesTableJSON()
 end
 
 function b2m.DB:Add(name, version, tab)
-    local res = sql.Query("SELECT id FROM b2m_pkgs WHERE name=" .. SQLStr(name))
+    local res = sql.Query("SELECT id FROM b2m_pkgs WHERE name=\"" .. name .. "\"")
 
     if istable(res) and #res > 0 then
-        local q = "UPDATE b2m_pkgs SET version=%s,clientonly=%s,serveronly=%s WHERE name=%s"
-        sql.Query(q:format(SQLStr(version), SQLStr(tab.client and 1 or 0), SQLStr(tab.server and 1 or 0, name)))
+        local q = "UPDATE b2m_pkgs SET version=\"%s\",clientonly=\"%s\",serveronly=\"%s\" WHERE name=\"%s\""
+        sql.Query(q:format(version, tab.client and 1 or 0, tab.server and 1 or 0, name))
 
         return
     end
 
-    local q = "INSERT INTO b2m_pkgs(name, version, clientonly, serveronly) VALUES(%s,%s,%s,%s)"
-    sql.Query(q:format(SQLStr(name), SQLStr(version), SQLStr(tab.client and 1 or 0), SQLStr(tab.server and 1 or 0)))
+    local q = "INSERT INTO b2m_pkgs(name, version, clientonly, serveronly) VALUES(\"%s\",\"%s\",\"%s\",\"%s\")"
+    sql.Query(q:format(name, version, tab.client and 1 or 0, tab.server and 1 or 0))
 end
 
 function b2m.DB:Remove(name)
-    local res = sql.Query("SELECT id FROM b2m_pkgs WHERE name=" .. SQLStr(name))
+    local res = sql.Query("SELECT id FROM b2m_pkgs WHERE name=\"" .. name .. "\"")
 
     if istable(res) and #res > 0 then
-        sql.Query("DELETE FROM b2m_pkgs WHERE name=" .. SQLStr(name))
+        sql.Query("DELETE FROM b2m_pkgs WHERE name=\"" .. name .. "\"")
 
         return
     end
+end
+
+function b2m.DB:HasPackage(pkg)
+    local result = false
+
+    local pkgs = self:GetPackages()
+    for _, tab in ipairs(pkgs) do
+        if tab.name != pkg then
+            continue
+        end
+
+        result = true
+        break
+    end
+
+    return result
 end
 
 /*
@@ -185,16 +205,13 @@ commands = {
     install = {
         call = function(args, flags)
             local pkg = args[1]
-            local version = not flags[args[2]] and args[2]
-
-            if not pkg then
-                return b2m.Print("You must specify the name of the package you want to install")
-            end
+            local version = args[2]
 
             local ver = b2m.CheckModule(pkg, version || "*", flags["--client-only"] or false)
 
             if ver then
                 b2m.DB:Add(pkg, ver, {client = flags["--client-only"], server = flags["--server-only"]})
+                b2m.Print("Module " .. pkg .. " has been installed successfully!")
             end
 
             b2m:UpdatePackages()
@@ -225,10 +242,17 @@ commands = {
                 return
             end
 
-            b2m.Remove(pkg)
+            if not b2m.DB:HasPackage(pkg) then
+                return b2m.Print("Package " .. pkg .. " doesn't found!")
+            end
+
+            b2m.Remove(pkg, true)
+            b2m.Remove(pkg, false)
             b2m.DB:Remove(pkg)
             fix.call()
             b2m:UpdatePackages()
+
+            b2m.Print("Removed package " .. pkg)
         end,
 
         args = {
@@ -258,14 +282,14 @@ commands = {
                     return
                 end
 
-                sql.Query("UPDATE b2m_pkgs SET id=" .. SQLStr(id) .. " WHERE name=" .. SQLStr(cell.name))
+                sql.Query("UPDATE b2m_pkgs SET id=\"" .. id .. "\" WHERE name=\"" .. cell.name .. "\"")
 
                 id = id + 1
 
                 continue
             end
 
-            sql.Query("UPDATE sqlite_sequence SET seq=" .. SQLStr(id-1) .. " WHERE name=\"b2m_pkgs\"")
+            sql.Query("UPDATE sqlite_sequence SET seq=\"" .. (id-1) .. "\" WHERE name=\"b2m_pkgs\"")
         end,
 
         flags = {},
@@ -282,7 +306,7 @@ commands = {
             for k, v in ipairs(pkgs) do
                 local iscl = tonumber(v.clientonly) == 1
                 local issv = tonumber(v.serveronly) == 1
-                local side = (iscl and not issv and "(CLIENT)") or (not iscl and issv and "SERVER") or "(SHARED)"
+                local side = (iscl and not issv and "(CLIENT)") or (not iscl and issv and "(SERVER)") or "(SHARED)"
                 b2m.Print("\t" .. k .. ": " .. v.name .. " " .. v.version .. " " .. side) // TODO
             end
         end,
@@ -336,7 +360,7 @@ concommand.Add("b2m", function(pl, _, args)
     local sub_command_tab = commands[sub_command]
 
     if not sub_command_tab then
-        b2m.Print("Unknown command")
+        b2m.Print("Unknown command. Type b2m help for help.")
 
         return
     end
